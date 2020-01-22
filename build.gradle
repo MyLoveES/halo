@@ -1,3 +1,4 @@
+// import org.yaml.snakeyaml.Yaml
 plugins {
     id 'org.springframework.boot' version '2.2.1.RELEASE'
     id "io.freefair.lombok" version "3.6.6"
@@ -113,4 +114,111 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // https://mvnrepository.com/artifact/org.mariadb.jdbc/mariadb-java-client
+    compile group: 'org.mariadb.jdbc', name: 'mariadb-java-client', version: '2.3.0'
+}
+
+// 编码格式
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// 拷贝文件
+task copyTask(type: Copy, dependsOn:bootJar) {
+    from 'build/libs'
+    into 'run'
+    include '*.jar'
+    rename{
+        'halo.jar'
+    }
+    doLast {
+        new File("run/run.sh").withWriter('UTF-8'){ writer ->
+            writer.println('#!/bin/sh')
+            writer.println('nohup java -server -Xms512M -Xmx1024M -jar halo.jar >/dev/null 2>&1 &')
+    	    writer.println('echo $! > pid')
+        }
+        File filesDir = new File("run/files");
+        if (!filesDir.exists()){
+            filesDir.mkdirs()
+        }
+    }
+}
+
+task copyTaskTest(type: Copy, dependsOn:bootJar) {
+    from 'build/libs'
+    into 'run'
+    include '*.jar'
+    rename{
+        'halo.jar'
+    }
+    doLast {
+        new File("run/run.sh").withWriter('UTF-8') { writer ->
+            writer.println('#!/bin/sh')
+            writer.println('nohup java -server -Xms512M -Xmx4096M -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=12405 -jar halo.jar --spring.profiles.active=test' +
+                    ' >/dev/null 2>&1 &')
+        }
+        File filesDir = new File("run/files");
+        if (!filesDir.exists()){
+            filesDir.mkdirs()
+        }
+    }
+}
+
+// 拷贝文件
+task copyTaskOnline(type: Copy, dependsOn:bootJar) {
+    from 'build/libs'
+    into 'run'
+    include '*.jar'
+    rename{
+        'halo.jar'
+    }
+    doLast {
+        new File("run/run.sh").withWriter('UTF-8'){ writer ->
+            writer.println('#!/bin/sh')
+            writer.println('nohup java -server -Xms2048m -Xmx4096m -Xmn1024m -XX:SurvivorRatio=4 -XX:MetaspaceSize=128m ' +
+                    '-XX:MaxMetaspaceSize=512m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:CMSFullGCsBeforeCompaction=0 ' +
+                    '-XX:CMSInitiatingOccupancyFraction=75 -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintHeapAtGC ' +
+                    '-XX:+PrintGCApplicationStoppedTime -Xloggc:logs/gc.log -jar halo.jar --spring.profiles.active=prod' +
+                    ' >/dev/null 2>&1 &')
+        }
+        File filesDir = new File("run/files");
+        if (!filesDir.exists()){
+            filesDir.mkdirs()
+        }
+    }
+}
+
+// 读取配置
+def getProperties = {
+    def properties = new Properties()
+    file("src/main/resources/application.yaml").withInputStream { inputStream ->
+        properties.load(inputStream)
+    }
+    properties
+}
+
+// 停止应用
+task shutdown(type: Exec) {
+    def properties = getProperties()
+    commandLine 'curl', '-X', 'POST', 'http://localhost:10001/actuator/shutdown'
+    ignoreExitValue true
+}
+
+// 启动应用
+task start(type: Exec, dependsOn: [copyTask, shutdown]) {
+    workingDir 'run'
+    commandLine 'sh', 'run.sh'
+}
+
+// 启动应用
+task startTest(type: Exec, dependsOn: [copyTaskTest, shutdown]) {
+    workingDir 'run'
+    commandLine 'sh', 'run.sh'
+}
+
+// 启动应用
+task startOnline(type: Exec, dependsOn: [copyTaskOnline, shutdown]) {
+    workingDir 'run'
+    commandLine 'sh', 'run.sh'
 }
