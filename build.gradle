@@ -145,6 +145,28 @@ task copyTask(type: Copy, dependsOn:bootJar) {
     }
 }
 
+// 拷贝文件
+task copyTaskHuang(type: Copy, dependsOn:bootJar) {
+    from 'build/libs'
+    into 'run-Huang'
+    include '*.jar'
+    rename{
+        'halo.jar'
+    }
+    doLast {
+        new File("run/run.sh").withWriter('UTF-8'){ writer ->
+            writer.println('#!/bin/sh')
+            writer.println('nohup java -server -Xms512M -Xmx4096M -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=12405 -jar halo.jar --spring.profiles.active=huang' +
+                    ' >/dev/null 2>&1 &')
+            writer.println('echo $! > pid')
+        }
+        File filesDir = new File("run/files");
+        if (!filesDir.exists()){
+            filesDir.mkdirs()
+        }
+    }
+}
+
 task copyTaskTest(type: Copy, dependsOn:bootJar) {
     from 'build/libs'
     into 'run'
@@ -207,6 +229,12 @@ task shutdown(type: Exec) {
 
 // 启动应用
 task start(type: Exec, dependsOn: [copyTask, shutdown]) {
+    workingDir 'run'
+    commandLine 'sh', 'run.sh'
+}
+
+// 启动应用
+task startHuang(type: Exec, dependsOn: [copyTaskHuang, shutdown]) {
     workingDir 'run'
     commandLine 'sh', 'run.sh'
 }
