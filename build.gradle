@@ -135,7 +135,7 @@ task copyTask(type: Copy, dependsOn:bootJar) {
     doLast {
         new File("run/run.sh").withWriter('UTF-8'){ writer ->
             writer.println('#!/bin/sh')
-            writer.println('nohup java -server -Xms512M -Xmx1024M -jar halo.jar >/dev/null 2>&1 &')
+            writer.println('nohup java -server -Xms216M -Xmx216M -jar halo.jar >/dev/null 2>&1 &')
     	    writer.println('echo $! > pid')
         }
         File filesDir = new File("run/files");
